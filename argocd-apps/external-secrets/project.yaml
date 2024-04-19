@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: external-secrets
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Homelab external-secrets Cluster
+  sourceRepos:
+    - 'https://github.com/trajanoreuter/kubernetes-homelab'
+  destinations:
+    - namespace: external-secrets
+      name: in-cluster
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceBlacklist:
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: false
+  roles:
+    - name: external-secrets
+      description: Sync privileges for external-secrets
+      policies:
+      - p, proj:external-secrets:external-secrets, applications, *, external-secrets/*, allow

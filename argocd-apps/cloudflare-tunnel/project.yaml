@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: cloudflare-tunnel
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Homelab cloudflare-tunnel Cluster
+  sourceRepos:
+    - 'https://github.com/trajanoreuter/kubernetes-homelab'
+  destinations:
+    - namespace: cloudflare
+      name: in-cluster
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceBlacklist:
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: false
+  roles:
+    - name: cloudflare-tunnel
+      description: Sync privileges for cloudflare-tunnel
+      policies:
+      - p, proj:cloudflare-tunnel:cloudflare-tunnel, applications, *, cloudflare-tunnel/*, allow

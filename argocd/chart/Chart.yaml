@@ -1,0 +1,10 @@
+apiVersion: v2
+name: homelab-argocd
+description: A Helm chart for argocd
+type: application
+version: 1
+appVersion: "2.10.7"
+dependencies:
+- name: argocd
+  version: 6.7.12
+  repository: https://argoproj.github.io/argo-helm

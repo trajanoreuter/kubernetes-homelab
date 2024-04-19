@@ -9,10 +9,10 @@ spec:
     initdb:
       database: homelab
       owner: homelab
-      postInitApplicationSQLRefs:
-        configMapRefs:
-          - name: vault-init
-            key: vault-init.sql
+      # postInitApplicationSQLRefs:
+      #   configMapRefs:
+      #     - name: vault-init
+      #       key: vault-init.sql
       secret:
         name: homelab-postgres-secret
   storage:

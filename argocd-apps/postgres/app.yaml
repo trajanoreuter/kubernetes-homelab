@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: postgres
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - cluster: in-cluster
+        namespace: postgres
+        branch: main
+        environment: development
+  template:
+    metadata:
+      name: postgres
+      namespace: argocd
+      labels:
+        type: app
+        env: '{{ environment }}'
+    spec:
+      project: 'postgres'
+      source:
+        repoURL: 'https://github.com/trajanoreuter/kubernetes-homelab'
+        path: postgres/chart
+        targetRevision: '{{ branch }}'
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        namespace: '{{ namespace }}'
+        name: '{{ cluster }}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: true
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+          - Replace=true

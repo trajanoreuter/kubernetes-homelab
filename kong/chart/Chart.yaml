@@ -1,0 +1,10 @@
+apiVersion: v2
+name: homelab-kong
+description: A Helm chart for kong
+type: application
+version: 1
+appVersion: "1.16.0"
+dependencies:
+  - name: kong
+    version: 2.38.0
+    repository: https://charts.konghq.com

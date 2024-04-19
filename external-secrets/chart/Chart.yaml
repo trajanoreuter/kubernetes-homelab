@@ -1,0 +1,10 @@
+apiVersion: v2
+name: homelab-external-secrets
+description: A Helm chart for external-secrets
+type: application
+version: 1
+appVersion: "1.16.0"
+dependencies:
+  - name: external-secrets
+    version: 0.9.16
+    repository: https://charts.external-secrets.io

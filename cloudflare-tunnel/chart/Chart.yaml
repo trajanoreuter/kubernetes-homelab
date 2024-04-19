@@ -1,0 +1,6 @@
+apiVersion: v2
+name: homelab-cloudflare-tunnel
+description: A Helm chart for cloudflare-tunnel
+type: application
+version: 1
+appVersion: "1.16.0"
