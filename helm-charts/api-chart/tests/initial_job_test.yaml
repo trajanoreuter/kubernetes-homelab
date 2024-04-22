@@ -1,0 +1,81 @@
+suite: Test InitialJob
+templates:
+  - job.yaml
+tests:
+  - it: Should return Job with correct params
+    set:
+      initialJob.enabled: true
+      initialJob.image: "alpine:3.12"
+      initialJob.command: ["/bin/sh"]
+      initialJob.args: ["-c", "echo $(date) - hello world"]
+      initialJob.resources.memory: "256Mi"
+      initialJob.resources.cpu: "100m"
+      initialJob.backoffLimit: 1
+      initialJob.parallelism: 1
+      initialJob.completions: 1
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "alpine:3.12"
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["/bin/sh"]
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["-c", "echo $(date) - hello world"]
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "256Mi"
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "100m"
+      - equal:
+          path: spec.parallelism
+          value: 1
+      - equal:
+          path: spec.completions
+          value: 1
+      - equal:
+          path: spec.backoffLimit
+          value: 1
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PreSync
+
+  - it: Should return api image if not set
+    set:
+      initialJob.enabled: true
+      image.repository: "alpine"
+      image.tag: "3.12"
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "alpine:3.12"
+
+  - it: Should configure envFrom
+    set:
+      initialJob.enabled: true
+      secrets:
+        envVarEnabled: true
+        loadAllKeys: true
+    asserts:
+      - isKind:
+          of: Job
+      - isNotNull:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: Should not configure envFrom
+    set:
+      initialJob.enabled: true
+      secrets:
+        envVarEnabled: true
+        loadAllKeys: false
+    asserts:
+      - isKind:
+          of: Job
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom

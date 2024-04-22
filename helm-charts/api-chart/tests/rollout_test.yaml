@@ -1,0 +1,104 @@
+suite: Test Rollout
+templates:
+  - rollout.yaml
+tests:
+  - it: Should return chart labels
+    asserts:
+      - isKind:
+          of: Rollout
+      - equal:
+          path: metadata.labels.chart-kind
+          value: "api"
+      - equal:
+          path: metadata.labels.chart-version
+          value: "1.0.0"
+
+  - it: Should return resources requests
+    asserts:
+      - isKind:
+          of: Rollout
+      - equal:
+          path: spec.template.spec.containers[*].resources.requests.cpu
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[*].resources.requests.memory
+          value: "500Mi"
+      - equal:
+          path: spec.template.spec.containers[*].resources.requests.ephemeral-storage
+          value: "1Gi"
+
+  - it: Should return resources limits
+    asserts:
+      - isKind:
+          of: Rollout
+      - equal:
+          path: spec.template.spec.containers[*].resources.limits.memory
+          value: "500Mi"
+      - equal:
+          path: spec.template.spec.containers[*].resources.limits.ephemeral-storage
+          value: "1Gi"
+
+  - it: Should configure extra ports
+    set:
+      internalContainerPorts:
+        - name: "http-test"
+          containerPort: 9090
+          protocol: "TCP"
+          mapToService: false
+    asserts:
+      - isKind:
+          of: Rollout
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].name
+          value: "http-test"
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 9090
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].protocol
+          value: "TCP"
+
+  - it: Should NOT configure extra ports
+    set:
+      internalContainerPorts: []
+    asserts:
+      - isKind:
+          of: Rollout
+      - isNull:
+          path: spec.template.spec.containers[0].ports[1]
+
+  - it: Should return revsion limits
+    asserts:
+      - isKind:
+          of: Rollout
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 3
+      - equal:
+          path: spec.analysis.successfulRunHistoryLimit
+          value: 3
+      - equal:
+          path: spec.analysis.unsuccessfulRunHistoryLimit
+          value: 1
+
+  - it: Should configure envFrom
+    set:
+      secrets:
+        envVarEnabled: true
+        loadAllKeys: true
+    asserts:
+      - isKind:
+          of: Rollout
+      - isNotNull:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: Should not configure envFrom
+    set:
+      secrets:
+        envVarEnabled: true
+        loadAllKeys: false
+    asserts:
+      - isKind:
+          of: Rollout
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom

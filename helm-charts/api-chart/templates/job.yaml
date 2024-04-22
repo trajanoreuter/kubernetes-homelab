@@ -1,0 +1,214 @@
+{{- if .Values.initialJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "api-chart.fullname" . }}
+  labels:
+    {{- include "api-chart.labels" . | nindent 4 }}
+    app: {{ include "api-chart.fullname" . }}
+    {{- with .Values.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    rollme: {{ randAlphaNum 5 | quote }}
+    {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.initialJob.backoffLimit }}
+  backoffLimit: {{ .Values.initialJob.backoffLimit }}
+  {{- end }}
+  {{- if .Values.initialJob.parallelism }}
+  parallelism: {{ .Values.initialJob.parallelism }}
+  {{- end }}
+  {{- if .Values.initialJob.completions }}
+  completions: {{ .Values.initialJob.completions }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.annotations }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "api-chart.labels" . | nindent 8 }}
+        app: {{ include "api-chart.fullname" . }}
+        job: {{ .Values.application.name }}
+        {{- with .Values.labels }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- with .Values.tolerations }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- with .Values.nodeSelector }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.cloudProviders.aws.karpenter.enabled }}
+        {{- if (eq .Values.labels.env "staging") }}
+        karpenter.sh/capacity-type: spot
+        {{- else }}
+        karpenter.sh/capacity-type: on-demand
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: "topology.kubernetes.io/zone"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ include "api-chart.fullname" . }}
+        - maxSkew: 1
+          topologyKey: "kubernetes.io/hostname"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ include "api-chart.fullname" . }}
+      restartPolicy: {{ .Values.initialJob.restartPolicy }}
+      serviceAccountName: {{ include "api-chart.serviceAccountName" . }}
+      securityContext:
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        runAsNonRoot: true
+      containers:
+        - name: {{ .Values.application.name }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+          {{- if .Values.initialJob.image }}
+          image: "{{ .Values.initialJob.image }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if and .Values.secrets.envVarEnabled .Values.secrets.loadAllKeys }}
+          envFrom:
+            - secretRef:
+                name: {{ include "api-chart.fullname" $ }}
+          {{- end }}
+          env:
+            {{- if and .Values.secrets.envVarEnabled (and .Values.secrets.keys (not .Values.secrets.loadAllKeys)) }}
+              {{- range .Values.secrets.keys }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-chart.fullname" $ }}
+                  key: {{ . }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.envs }}
+            {{- range $key, $value := .Values.envs }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+            {{- end }}
+            {{- if .Values.jsonEnvs }}
+            {{- range $key, $value := .Values.jsonEnvs }}
+            - name: {{ $key }}
+              value: {{ $value | toJson |  quote }}
+            {{- end }}
+            {{- end }}
+          {{- if .Values.initialJob.command }}
+          {{- with .Values.initialJob.command }}
+          command:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.initialJob.args }}
+          {{- with .Values.initialJob.args }}
+          args:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          resources:
+            limits:
+              memory: {{ .Values.initialJob.resources.memory }}
+              ephemeral-storage: {{ .Values.resources.storage }}
+            requests:
+              memory: {{ .Values.initialJob.resources.memory }}
+              cpu: {{ .Values.initialJob.resources.cpu }}
+              ephemeral-storage: {{ .Values.resources.storage }}
+        {{- range $sidecar := .Values.sidecars }}
+        {{- if $sidecar.enabled }}
+        - name: {{ $sidecar.name }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+          image: "{{ $sidecar.image }}"
+          {{- if $sidecar.command }}
+          {{- with $sidecar.command }}
+          command:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if $sidecar.args }}
+          {{- with $sidecar.args }}
+          args:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          imagePullPolicy: IfNotPresent
+          {{- if $sidecar.containerPort }}
+          ports:
+            - name: http
+              containerPort: {{ $sidecar.containerPort }}
+              protocol: TCP
+          {{- end }}
+          env:
+            {{- if $sidecar.envs}}
+            {{- range $key, $value := $sidecar.envs }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+            {{- end }}
+            {{- if $sidecar.secrets }}
+              {{- range $sidecar.secrets }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-chart.fullname" $ }}
+                  key: {{ . }}
+              {{- end }}
+            {{- end }}
+          resources:
+            limits:
+              memory: {{ $sidecar.resources.memory }}
+            requests:
+              memory: {{ $sidecar.resources.memory }}
+              cpu: {{ $sidecar.resources.cpu }}
+        {{- end }}
+        {{- end }}
+          volumeMounts:
+            - name: {{ include "api-chart.fullname" . }}
+              mountPath: "/configmap"
+              readOnly: true
+      {{- if .Values.secrets.keys }}
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+      {{- end }}
+      volumes:
+        - name: {{ include "api-chart.fullname" . }}
+          configMap:
+            name: {{ include "api-chart.fullname" . }}
+        {{- if .Values.secrets.keys }}
+        - name: secrets
+          secret:
+            defaultMode: 420
+            secretName: {{ include "api-chart.fullname" . }}
+        {{- end }}
+{{- end }}

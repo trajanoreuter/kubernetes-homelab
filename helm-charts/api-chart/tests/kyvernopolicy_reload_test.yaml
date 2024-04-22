@@ -1,0 +1,49 @@
+suite: Test Kyverno Policy Reload Secret
+templates:
+  - kyvernopolicy.yaml
+tests:
+  - it: should return PreSync argocd hook
+    set:
+      secrets.reloadEnabled: true
+    asserts:      
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PreSync
+
+  - it: Should return Kyverno Policy with correct params
+    set:
+      secrets.reloadEnabled: true      
+    asserts:
+      - containsDocument:
+          apiVersion: kyverno.io/v1
+          kind: Policy
+      - matchRegex:
+          path: metadata.name
+          pattern: ^.*-rt$
+      - equal:      
+          path: metadata.annotations["policies.kyverno.io/title"]
+          value: Restart Rollout On Secret Change
+      - equal:
+          path: spec.schemaValidation
+          value: false
+      - equal:
+          path: spec.mutateExistingOnPolicyUpdate
+          value: false
+      - equal:
+          path: spec.rules[0].name
+          value: update-secret
+      - equal:
+          path: spec.rules[0].match.any[0].resources.kinds
+          value: [Secret]
+      - equal:
+          path: spec.rules[0].match.any[0].resources.names
+          value: [RELEASE-NAME-__change_me__]
+      - equal:
+          path: spec.rules[0].preconditions.all[0].value
+          value: UPDATE      
+      - equal:
+          path: spec.rules[0].mutate.targets[0].kind
+          value: Rollout
+      - exists:
+          path: spec.rules[0].mutate.patchStrategicMerge.spec.template.metadata.annotations["ops.corp.com/triggerrestart"]
+                   

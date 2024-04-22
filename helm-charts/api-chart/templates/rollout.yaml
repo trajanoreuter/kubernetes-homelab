@@ -1,0 +1,250 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "api-chart.fullname" . }}
+  labels:
+    {{- include "api-chart.labels" . | nindent 4 }}
+    app: {{ include "api-chart.fullname" . }}
+    {{- with .Values.labels }}
+          {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  revisionHistoryLimit: 3
+  analysis:
+    successfulRunHistoryLimit: 3
+    unsuccessfulRunHistoryLimit: 1
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "api-chart.fullname" . }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.annotations }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "api-chart.labels" . | nindent 8 }}
+        app: {{ include "api-chart.fullname" . }}
+        {{- with .Values.labels }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if not (eq .Values.labels.env "staging") }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ include "api-chart.fullname" . }}
+                topologyKey: "topology.kubernetes.io/zone"
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: "topology.kubernetes.io/zone"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ include "api-chart.fullname" . }}
+        - maxSkew: 1
+          topologyKey: "kubernetes.io/hostname"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ include "api-chart.fullname" . }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- with .Values.tolerations }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- with .Values.nodeSelector }}
+              {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ include "api-chart.serviceAccountName" . }}
+      securityContext:
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        runAsNonRoot: true
+      containers:
+        - name: {{ .Values.application.name }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if and .Values.secrets.envVarEnabled .Values.secrets.loadAllKeys }}
+          envFrom:
+            - secretRef:
+                name: {{ include "api-chart.fullname" $ }}
+          {{- end }}
+          env:
+            {{- if and .Values.secrets.envVarEnabled (and .Values.secrets.keys (not .Values.secrets.loadAllKeys)) }}
+              {{- range .Values.secrets.keys }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-chart.fullname" $ }}
+                  key: {{ . }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.envs}}
+            {{- range $key, $value := .Values.envs }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+            {{- end }}
+            {{- if .Values.jsonEnvs }}
+            {{- range $key, $value := .Values.jsonEnvs }}
+            - name: {{ $key }}
+              value: {{ $value | toJson |  quote }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          {{- if .Values.internalContainerPorts }}
+            {{- range $k, $port := .Values.internalContainerPorts }}
+            - name: {{ $port.name }}
+              containerPort: {{ $port.containerPort }}
+              protocol: {{ $port.protocol }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.healthcheck.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthcheck.livenessProbe.path }}
+              port: http
+            failureThreshold: {{ .Values.healthcheck.livenessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.healthcheck.livenessProbe.periodSeconds }}
+            initialDelaySeconds: {{ .Values.healthcheck.livenessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.healthcheck.livenessProbe.timeoutSeconds }}
+          {{- end }}
+          {{- if .Values.healthcheck.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthcheck.readinessProbe.path }}
+              port: http
+            failureThreshold: {{ .Values.healthcheck.readinessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.healthcheck.readinessProbe.periodSeconds }}
+            initialDelaySeconds: {{ .Values.healthcheck.readinessProbe.initialDelaySeconds }}
+            timeoutSeconds: {{ .Values.healthcheck.readinessProbe.timeoutSeconds }}
+          {{- end }}
+          resources:
+            limits:
+              memory: {{ .Values.resources.memory }}
+              ephemeral-storage: {{ .Values.resources.storage }}
+            requests:
+              memory: {{ .Values.resources.memory }}
+              cpu: {{ .Values.resources.cpu }}
+              ephemeral-storage: {{ .Values.resources.storage }}
+          {{- if .Values.command }}
+          {{- with .Values.command }}
+          command:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.args }}
+          {{- with .Values.args }}
+          args:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+        {{- range $sidecar := .Values.sidecars }}
+        {{- if $sidecar.enabled }}
+        - name: {{ $sidecar.name }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+          image: "{{ $sidecar.image }}"
+          {{- if $sidecar.command }}
+          {{- with $sidecar.command }}
+          command:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if $sidecar.args }}
+          {{- with $sidecar.args }}
+          args:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+          {{- end }}
+          imagePullPolicy: IfNotPresent
+          {{- if $sidecar.containerPort }}
+          ports:
+            - name: http
+              containerPort: {{ $sidecar.containerPort }}
+              protocol: TCP
+          {{- end }}
+          env:
+            {{- if $sidecar.envs}}
+            {{- range $key, $value := $sidecar.envs }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}
+            {{- end }}
+            {{- if  $sidecar.secrets }}
+            {{- range $sidecar.secrets }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-chart.fullname" $ }}
+                  key: {{ . }}
+            {{- end }}
+            {{- end }}
+          resources:
+            limits:
+              memory: {{ $sidecar.resources.memory }}
+            requests:
+              memory: {{ $sidecar.resources.memory }}
+              cpu: {{ $sidecar.resources.cpu }}
+        {{- end }}
+        {{- end }}
+          volumeMounts:
+          {{- if or (.Values.secrets.keys) (.Values.secrets.loadAllKeys) }}
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+          {{- end }}
+          {{- if .Values.configMap }}
+          {{- range .Values.configMap }}
+          {{- if and .volumeMount .volumeMount.enabled  }}
+            - name: config
+              mountPath: {{ .volumeMount.mountPath }}
+              {{- if .volumeMount.readOnly }}
+              readOnly: true
+              {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+      volumes:
+      {{- if or (.Values.secrets.keys) (.Values.secrets.loadAllKeys) }}
+        - name: secrets
+          secret:
+            defaultMode: 420
+            secretName: {{ include "api-chart.fullname" . }}
+      {{- end }}
+      {{- if .Values.configMap }}
+        - name: config
+          configMap:
+            name: {{ include "api-chart.fullname" . }}-configmap
+      {{- end }}

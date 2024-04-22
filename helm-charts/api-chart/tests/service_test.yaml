@@ -1,0 +1,33 @@
+suite: Test Service
+templates:
+  - service-stable.yaml
+tests:
+
+  - it: Should configure extra ports
+    set:
+      internalContainerPorts:
+        - name: "http-test"
+          containerPort: 9090
+          protocol: "TCP"
+          mapToService: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[1].name
+          value: "http-test"
+      - isNull:
+          path: spec.ports[2]
+
+  - it: Should NOT configure extra ports
+    set:
+      internalContainerPorts:
+        - name: "http-test"
+          containerPort: 9090
+          protocol: "TCP"
+          mapToService: false
+    asserts:
+      - isKind:
+          of: Service
+      - isNull:
+          path: spec.ports[1]

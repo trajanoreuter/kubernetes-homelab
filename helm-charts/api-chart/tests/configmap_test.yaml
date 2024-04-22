@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+
+suite: Test ConfigMap
+templates:
+  - configmap.yaml
+tests:
+  - it: Should not return configmap documents
+    set:
+      configMap: []
+    
+    asserts:
+      - notFailedTemplate: {}
+      - hasDocuments:
+          count: 0
+  
+  - it: Should return configmap documents
+    set:
+      configMap:
+        - name: test2.yaml
+          values:
+            simpleValue: test
+    
+    asserts:
+      - notFailedTemplate: {}
+      - isKind:
+          of: ConfigMap
+
+  - it: Assert the configmap data values
+    set:
+      configMap:
+        - name: test.yaml
+          values:
+            simpleValue: test
+        - name: test2.yaml
+          volumeMount:
+            enabled: true
+            mountPath: /etc/test
+          values:
+            dict:
+              address: 0.0.0.0:8686
+              enabled: true              
+            list:
+              - name: element1
+              - name: element1
+            simpleValue: test
+
+    asserts:
+      - notFailedTemplate: {}
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data
+          value:
+            test.yaml: |
+              simpleValue: test
+            test2.yaml: |
+              dict:
+                address: 0.0.0.0:8686
+                enabled: true
+              list:
+              - name: element1
+              - name: element1
+              simpleValue: test

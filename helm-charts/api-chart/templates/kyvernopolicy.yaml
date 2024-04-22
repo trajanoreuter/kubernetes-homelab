@@ -1,0 +1,63 @@
+{{- if .Values.secrets.reloadEnabled }}
+---
+apiVersion: kyverno.io/v1
+kind: Policy
+metadata:
+  name: {{ include "api-chart.fullname" . }}-rt
+  labels:
+    {{- include "api-chart.labels" . | nindent 4 }}
+    {{- with .Values.labels }}
+          {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    policies.kyverno.io/title: Restart Rollout On Secret Change
+    policies.kyverno.io/category: Other
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Rollout
+    policies.kyverno.io/description: >-
+      If Secrets are mounted in ways which do not naturally allow updates to
+      be live refreshed it may be necessary to modify a Rollout. This policy
+      watches a Secret and if it changes will write an annotation
+      to one or more target Rollouts or Deployments thus triggering a new rollout and thereby
+      refreshing the referred Secret. It may be necessary to grant additional privileges
+      to the Kyverno ServiceAccount, via one of the existing ClusterRoleBindings or a new
+      one, so it can modify Rollouts.    
+spec:
+  schemaValidation: false
+  mutateExistingOnPolicyUpdate: false
+  rules:
+  - name: update-secret
+    match:
+      any:
+      - resources:
+          kinds:
+          - Secret
+          names:              
+          - {{ include "api-chart.fullname" $ }}
+    preconditions:
+      all:
+      - key: {{`"{{request.operation || 'BACKGROUND'}}"`}}
+        operator: Equals
+        value: UPDATE
+    mutate:
+      targets:
+        - apiVersion: argoproj.io/v1alpha1
+          kind: Rollout
+          name: {{ include "api-chart.fullname" . }}          
+      patchStrategicMerge:
+        spec:
+          template:
+            metadata:
+              annotations:
+                ops.corp.com/triggerrestart: {{`"{{request.object.metadata.resourceVersion}}"`}}
+            (spec):
+              (containers):
+              - (env):
+                - (valueFrom):
+                    (secretKeyRef):
+                      (name): {{ include "api-chart.fullname" $ }}
+{{- end }}

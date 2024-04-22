@@ -1,0 +1,167 @@
+replicaCount: 1 # Initial replicas count
+
+image:
+  repository: ""
+  pullPolicy: IfNotPresent
+  tag: ""
+
+containerPort: 80
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+
+command: "" # ["/bin/sh"] # exec coomand
+args: ""
+  # - "-c"
+  # - "echo $(date) - hello world"
+
+initialJob:
+  enabled: false
+  image: # image to run the initial job. If not set, the image from the container will be used
+  resources:
+    memory: "256Mi"
+    cpu: "100m"
+  command: "" # ["/bin/sh"] # exec coomand
+  args: ""
+    # - "-c"
+    # - "echo $(date) - hello world"
+  restartPolicy: Never
+  # number of before considering a job as failed
+  backoffLimit: 1
+  parallelism: ""
+  completions: ""
+  # doc ref: https://kubernetes.io/docs/concepts/workloads/controllers/job/
+
+labels:
+  env: "__change_me__" # development | staging | sandbox | production
+  project: "__change_me__" # Project name
+  owner: "__change_me__" # Project owner
+  support: "__change_me__" # Project support team
+  github-org: "__change_me__" # Github organization 
+  github-repo: "__change_me__" # Github repository name
+
+annotations:
+  documentation: "__change_me__" # Project documentation link
+
+application:
+  name: "__change_me__"
+  language: "__change_me__"
+  environment: "__change_me__" # development | staging | sandbox | production
+
+github:
+  lastCommitSha: ""
+  repositoryUrl: ""
+
+nodeSelector: {}
+  # purpose: xpto
+
+tolerations: [] # Tolerations
+  # - key: "key"
+  #   operator: "Equal"
+  #   value: "value"
+  #   effect: "NoSchedule"
+
+envs: {} # Env variables for configuration
+  # CONFIG_NAME: value
+
+jsonEnvs: {} # JSON Env variables for configuration
+  # CONFIG_NAME: {"somefield": "someValue"}
+
+configMap: []
+  # - name: test.yaml
+  #   values:
+  #     simpleValue: test
+  # - name: test2.yaml
+  #   volumeMount:
+  #     enabled: true
+  #     mountPath: /etc/test
+  #   values:
+  #     simpleValue: test2
+  #     dict:
+  #       enabled: true
+  #       address: 0.0.0.0:8686
+  #     list:
+  #       - name: element1
+  #       - name: element1
+
+secrets:
+  reloadEnabled: false # when set to true, after changing the secret the container is automatically restarted
+  envVarEnabled: false # set it to true if you want to use env vars instead of mounting volumes
+  loadAllKeys: false # set it to true if you want to load all keys automatically (without having to specify them)
+  secretStore:
+    name: cluster-secret-store-vault # defines the ClusterSecretStore to be used, in the recovery of the secrets
+    kind: ClusterSecretStore # defines the kind of the ClusterSecretStore to be used, in the recovery of the secrets
+  kv:
+  path:
+  keys: [] # Secrets
+    # - SECRET_NAME
+
+resources:
+  memory: "500Mi"
+  cpu: "1"
+  storage: "1Gi"
+
+pdb:
+  enabled: true
+  # doc ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+  minAvailable: 50%
+  maxUnavailable: # 1
+
+ingress:
+  enabled: false
+  annotations: {}
+  class: kong
+  hosts:
+    - host: chart-example.local
+      paths:
+      - path: /
+  # Optional
+  # tls:
+  #   - secretName: ""
+  #     hosts:
+  #       - chart-example.local
+
+internalContainerPorts: []
+  #  - name: http-metrics
+  #    containerPort: 2112
+  #    protocol: TCP
+  #    mapToService: false
+  #  - name: http-internal
+  #    containerPort: 3030
+  #    protocol: TCP
+  #    mapToService: true
+
+healthcheck:
+  livenessProbe:
+    enabled: true
+    path: /
+    failureThreshold: 3
+    periodSeconds: 20
+    initialDelaySeconds: 15
+    timeoutSeconds: 10
+
+  readinessProbe:
+    enabled: true
+    path: /
+    failureThreshold: 3
+    periodSeconds: 20
+    initialDelaySeconds: 15
+    timeoutSeconds: 10
+
+sidecars:
+  - name: ""
+    enabled: false
+    command: "" # ["/bin/sh"]
+    args: ""
+      # - "-c"
+      # - "echo $(date) - hello world"
+    secrets: [] # Secrets
+      # - SECRET_NAME
+    envs: {} # Env variables for configuration
+      # CONFIG_NAME: value
+    containerPort: ""
+    resources:
+      memory: "128Mi"
+      cpu: "100m"
+    image: ""
