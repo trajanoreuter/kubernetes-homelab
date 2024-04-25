@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - cluster: in-cluster
+        namespace: monitoring
+        branch: main
+        environment: development
+  template:
+    metadata:
+      name: monitoring
+      namespace: argocd
+      labels:
+        type: app
+        env: '{{ environment }}'
+    spec:
+      project: 'monitoring'
+      source:
+        repoURL: 'https://github.com/trajanoreuter/kubernetes-homelab'
+        path: monitoring/chart
+        targetRevision: '{{ branch }}'
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        namespace: '{{ namespace }}'
+        name: '{{ cluster }}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+          prune: true
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+          - Replace=true
