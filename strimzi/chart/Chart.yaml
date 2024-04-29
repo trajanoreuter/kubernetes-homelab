@@ -1,0 +1,10 @@
+apiVersion: v2
+name: homelab-strimzi
+description: A Helm chart for strimzi
+type: application
+version: 1
+appVersion: "0.40.0"
+dependencies:
+  - name: strimzi-kafka-operator
+    version: 0.40.0
+    repository: oci://quay.io/strimzi-helm/strimzi-kafka-operator
